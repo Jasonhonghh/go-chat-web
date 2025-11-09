@@ -25,4 +25,8 @@ npm run dev
 - 支持 API Mock 测试
 
 ## 配置
-环境变量请参考 .env.local 文件。
+环境变量写在`.enc.local`文件中，示例：
+```
+NEXT_PUBLIC_API_BASE_URL=http://chat.dev-insight.cloud:8080
+NEXT_PUBLIC_ENABLE_API_MOCK=1
+```

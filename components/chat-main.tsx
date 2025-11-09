@@ -1,113 +1,180 @@
+'use client';
+
+import { useState, useRef, useEffect, FormEvent } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, ImageIcon, MoreVertical } from "lucide-react";
+import { ArrowRight, ImageIcon, MoreVertical, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useChat } from "@/contexts/chat-context";
+import { useAuth } from "@/contexts/auth-context";
+import { Message } from "@/lib/types";
 
 interface MessageBubbleProps {
-  message: string;
-  isUserMessage: boolean;
-  avatarSrc?: string;
+  message: Message;
+  isCurrentUser: boolean;
 }
 
-const MessageBubble = ({ message, isUserMessage, avatarSrc }: MessageBubbleProps) => (
-  <div className={cn("flex items-start gap-3", isUserMessage ? "justify-end" : "")}>
-    {!isUserMessage && (
-      <Avatar className="h-8 w-8">
-        <AvatarImage src={avatarSrc || "/placeholder.svg"} alt="User Avatar" />
-        <AvatarFallback>U</AvatarFallback>
-      </Avatar>
-    )}
-    <div
-      className={cn(
-        "max-w-[70%] rounded-lg p-3",
-        isUserMessage ? "bg-primary text-primary-foreground rounded-br-none" : "rounded-bl-none"
-      )}>
-      <p className="text-sm">{message}</p>
-    </div>
-  </div>
-);
-
-export function ChatMain() {
-  const currentChatUser = {
-    name: "Shannon Baker",
-    avatarSrc: "/placeholder.svg?height=40&width=40",
-    status: "last seen recently"
+const MessageBubble = ({ message, isCurrentUser }: MessageBubbleProps) => {
+  const formatTime = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
-  const messages = [
-    {
-      id: "m1",
-      sender: "other",
-      avatarSrc: "/placeholder.svg?height=32&width=32",
-      content:
-        "I think you should go for it. You're more than capable and it sounds like a great opportunity for growth."
-    },
-    {
-      id: "m2",
-      sender: "user",
-      content:
-        "It's a bigger company and a more challenging role. I'm worried it might be too much to handle."
-    },
-    {
-      id: "m3",
-      sender: "user",
-      content:
-        "Thanks, Mark. I needed that encouragement. I'll start working on my application tonight."
-    },
-    {
-      id: "m4",
-      sender: "other",
-      avatarSrc: "/placeholder.svg?height=32&width=32",
-      content: "Anytime! Let me know if you need any help with your resume or cover letter."
-    },
-    {
-      id: "m5",
-      sender: "user",
-      content: "Will do. Appreciate it!"
+  return (
+    <div className={cn("flex items-start gap-3", isCurrentUser ? "justify-end" : "")}>
+      {!isCurrentUser && (
+        <Avatar className="h-8 w-8">
+          <AvatarImage src={message.senderAvatar} alt={message.senderName} />
+          <AvatarFallback>{message.senderName.charAt(0).toUpperCase()}</AvatarFallback>
+        </Avatar>
+      )}
+      <div className="flex flex-col gap-1">
+        {!isCurrentUser && (
+          <span className="text-muted-foreground text-xs px-1">{message.senderName}</span>
+        )}
+        <div
+          className={cn(
+            "max-w-[70%] rounded-lg p-3",
+            isCurrentUser
+              ? "bg-primary text-primary-foreground rounded-br-none"
+              : "bg-muted rounded-bl-none"
+          )}
+        >
+          <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+        </div>
+        <span className="text-muted-foreground text-xs px-1">
+          {formatTime(message.timestamp)}
+          {isCurrentUser && message.status && (
+            <span className="ml-1">
+              {message.status === 'sending' && '⏳'}
+              {message.status === 'sent' && '✓'}
+              {message.status === 'delivered' && '✓✓'}
+              {message.status === 'read' && '✓✓'}
+            </span>
+          )}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+export function ChatMain() {
+  const { activeChat, messages: allMessages, sendMessage } = useChat();
+  const { user } = useAuth();
+  const [inputValue, setInputValue] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const messages = activeChat ? allMessages[activeChat.id] || [] : [];
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSendMessage = (e: FormEvent) => {
+    e.preventDefault();
+    if (!inputValue.trim() || !activeChat) return;
+
+    sendMessage(activeChat.id, inputValue.trim());
+    setInputValue("");
+  };
+
+  const getUserStatus = () => {
+    if (!activeChat) return '';
+    
+    if (activeChat.type === 'group') {
+      return `${activeChat.participants.length} members`;
     }
-  ];
+
+    // For private chats, show the other user's status
+    const otherUser = activeChat.participants.find(p => p.id !== user?.id);
+    if (!otherUser) return '';
+
+    if (otherUser.status === 'online') return 'online';
+    if (otherUser.lastSeen) {
+      const diff = Date.now() - otherUser.lastSeen;
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      if (minutes < 60) return `last seen ${minutes}m ago`;
+      if (hours < 24) return `last seen ${hours}h ago`;
+      return 'last seen recently';
+    }
+    return 'offline';
+  };
+
+  if (!activeChat) {
+    return (
+      <div className="m-4 flex flex-1 flex-col items-center justify-center rounded-lg border shadow-sm">
+        <div className="text-muted-foreground text-center">
+          <p className="text-lg font-medium">No chat selected</p>
+          <p className="text-sm">Select a chat from the sidebar to start messaging</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="m-4 flex flex-1 flex-col rounded-lg shadow-sm">
-      <div className="flex items-center justify-between border border-b p-4">
+    <div className="m-4 flex flex-1 flex-col rounded-lg border shadow-sm">
+      {/* Chat Header */}
+      <div className="flex items-center justify-between border-b p-4">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
-            <AvatarImage
-              src={currentChatUser.avatarSrc || "/placeholder.svg"}
-              alt={currentChatUser.name}
-            />
-            <AvatarFallback>{currentChatUser.name.charAt(0)}</AvatarFallback>
+            <AvatarImage src={activeChat.avatar} alt={activeChat.name} />
+            <AvatarFallback>{activeChat.name.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div>
-            <h2 className="font-semibold">{currentChatUser.name}</h2>
-            <p className="text-muted-foreground text-sm">{currentChatUser.status}</p>
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold">{activeChat.name}</h2>
+              {activeChat.type === 'group' && (
+                <Users className="text-muted-foreground h-4 w-4" />
+              )}
+            </div>
+            <p className="text-muted-foreground text-sm">{getUserStatus()}</p>
           </div>
         </div>
         <MoreVertical className="text-muted-foreground h-5 w-5 cursor-pointer" />
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-6">
-        {messages.map((msg) => (
-          <MessageBubble
-            key={msg.id}
-            message={msg.content}
-            isUserMessage={msg.sender === "user"}
-            avatarSrc={msg.avatarSrc}
-          />
-        ))}
-      </div>
+      {/* Messages Area */}
+      <ScrollArea className="flex-1 p-6">
+        <div className="space-y-4">
+          {messages.length === 0 ? (
+            <div className="text-muted-foreground text-center text-sm">
+              No messages yet. Start the conversation!
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                isCurrentUser={msg.senderId === user?.id}
+              />
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      </ScrollArea>
 
-      <div className="flex items-center gap-3 border border-t p-4">
+      {/* Message Input */}
+      <form onSubmit={handleSendMessage} className="flex items-center gap-3 border-t p-4">
         <ImageIcon className="text-muted-foreground h-5 w-5 cursor-pointer" />
         <Input
-          placeholder="Enter a prompt here"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder="Type a message..."
           className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0"
         />
-        <Button size="icon" className="rounded-full">
+        <Button 
+          type="submit" 
+          size="icon" 
+          className="rounded-full"
+          disabled={!inputValue.trim()}
+        >
           <ArrowRight />
         </Button>
-      </div>
+      </form>
     </div>
   );
 }

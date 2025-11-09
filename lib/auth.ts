@@ -15,3 +15,16 @@ export function logout() {
     localStorage.removeItem("authToken")
   }
 }
+
+export function getAuthToken(): string | null {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("authToken")
+  }
+  return null
+}
+
+export function removeAuthToken() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("authToken")
+  }
+}
