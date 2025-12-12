@@ -3,10 +3,13 @@
 import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Search, User, Users } from "lucide-react";
+import { Search, User, Users, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/contexts/chat-context";
 import { Chat } from "@/lib/types";
+import { useState as useReactState } from "react";
+import { CreateGroupDialog } from "@/components/create-group-dialog";
+import { api } from "@/lib/api";
 
 interface ChatContactProps {
   chat: Chat;
@@ -69,6 +72,7 @@ const ChatContact = ({ chat, isActive, onClick }: ChatContactProps) => {
 export function ChatSidebar() {
   const [activeTab, setActiveTab] = useState<'private' | 'group'>('private');
   const { chats, activeChat, setActiveChat, isLoading } = useChat();
+  const [openCreateGroup, setOpenCreateGroup] = useReactState(false);
 
   const filteredChats = chats.filter(chat => chat.type === activeTab);
 
@@ -124,8 +128,23 @@ export function ChatSidebar() {
       </div>
 
       <div className="mt-6">
-        <Button className="w-full">New chat</Button>
+        <Button className="w-full" onClick={() => setOpenCreateGroup(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          New Group
+        </Button>
       </div>
+
+      <CreateGroupDialog
+        open={openCreateGroup}
+        onOpenChange={setOpenCreateGroup}
+        onCreateGroup={async (groupData) => {
+          const group = await api.group.createGroup(groupData);
+          // After creating, refresh chats list
+          // Depending on chat-context implementation, could fetch or optimistic add.
+          // Here we simply close the dialog; chat list refresh should be triggered elsewhere if needed.
+          setOpenCreateGroup(false);
+        }}
+      />
     </div>
   );
 }

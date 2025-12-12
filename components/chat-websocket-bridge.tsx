@@ -9,8 +9,8 @@ import { useAuth } from '@/contexts/auth-context';
  * Component that bridges WebSocket events with Chat state management
  */
 export function ChatWebSocketBridge() {
-  const { onNewMessage, onUserStatus, onMessageStatus } = useWebSocket();
-  const { addMessage, updateMessageStatus, chats } = useChat();
+  const { onNewMessage, onUserStatus, onMessageStatus, onTyping, onMessageEdited, onMessageDeleted } = useWebSocket();
+  const { addMessage, updateMessageStatus, updateMessageContent, removeMessage, chats } = useChat();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -33,12 +33,31 @@ export function ChatWebSocketBridge() {
       // This could update participant status in chats
     });
 
+    // Listen for typing events
+    const unsubscribeTyping = onTyping((event) => {
+      console.log('Typing event:', event);
+      // Could update UI to show "{user} is typing..."
+    });
+
+    // Listen for message edited events
+    const unsubscribeEdited = onMessageEdited((event) => {
+      updateMessageContent(event.data.chat_id, event.data.message_id, event.data.content);
+    });
+
+    // Listen for message deleted events
+    const unsubscribeDeleted = onMessageDeleted((event) => {
+      removeMessage(event.data.chat_id, event.data.message_id);
+    });
+
     return () => {
       unsubscribeMessages();
       unsubscribeStatus();
       unsubscribeUserStatus();
+      unsubscribeTyping();
+      unsubscribeEdited();
+      unsubscribeDeleted();
     };
-  }, [onNewMessage, onMessageStatus, onUserStatus, addMessage, updateMessageStatus, user]);
+  }, [onNewMessage, onMessageStatus, onUserStatus, onTyping, onMessageEdited, onMessageDeleted, addMessage, updateMessageStatus, updateMessageContent, removeMessage, user]);
 
   return null; // This is a logic-only component
 }

@@ -10,9 +10,11 @@ interface ChatContextType {
   activeChat: Chat | null;
   isLoading: boolean;
   setActiveChat: (chat: Chat | null) => void;
-  sendMessage: (chatId: string, content: string) => void;
+  sendMessage: (chatId: string, content: string, replyTo?: string) => void;
   addMessage: (message: Message) => void;
   updateMessageStatus: (messageId: string, status: Message['status']) => void;
+  updateMessageContent: (chatId: string, messageId: string, content: string) => void;
+  removeMessage: (chatId: string, messageId: string) => void;
   markChatAsRead: (chatId: string) => void;
   fetchChats: () => Promise<void>;
   fetchMessages: (chatId: string) => Promise<void>;
@@ -35,8 +37,8 @@ export function ChatProvider({ children, currentUser }: ChatProviderProps) {
   const fetchChats = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await api.get<Chat[]>('/chats');
-      setChats(response.data);
+      const { data } = await api.chat.getChats({ page: 1, limit: 50, sort: 'updated_at:desc' });
+      setChats(data?.items ?? []);
     } catch (error) {
       console.error('Failed to fetch chats:', error);
     } finally {
@@ -47,10 +49,10 @@ export function ChatProvider({ children, currentUser }: ChatProviderProps) {
   // Fetch messages for a specific chat
   const fetchMessages = useCallback(async (chatId: string) => {
     try {
-      const response = await api.get<Message[]>(`/messages/${chatId}`);
+      const { data } = await api.message.getMessages(chatId, { page: 1, limit: 100, sort: 'created_at:asc' });
       setMessages(prev => ({
         ...prev,
-        [chatId]: response.data,
+        [chatId]: data?.items ?? [],
       }));
     } catch (error) {
       console.error(`Failed to fetch messages for chat ${chatId}:`, error);
@@ -58,7 +60,7 @@ export function ChatProvider({ children, currentUser }: ChatProviderProps) {
   }, []);
 
   // Send a new message (optimistic update)
-  const sendMessage = useCallback((chatId: string, content: string) => {
+  const sendMessage = useCallback((chatId: string, content: string, replyTo?: string) => {
     if (!currentUser) return;
     
     const tempId = `temp-${Date.now()}`;
@@ -85,7 +87,41 @@ export function ChatProvider({ children, currentUser }: ChatProviderProps) {
         ? { ...chat, lastMessage: newMessage, updatedAt: Date.now() }
         : chat
     ));
+
+    // Call backend to send message
+    api.message.sendMessage(chatId, { content, type: 'text', reply_to: replyTo }).catch((error) => {
+      console.error('Failed to send message:', error);
+    });
   }, [currentUser]);
+  // Update message content (after edit)
+  const updateMessageContent = useCallback((chatId: string, messageId: string, content: string) => {
+    setMessages(prev => ({
+      ...prev,
+      [chatId]: (prev[chatId] || []).map((msg) =>
+        msg.id === messageId ? { ...msg, content } : msg
+      ),
+    }));
+
+    setChats(prev => prev.map(chat =>
+      chat.id === chatId && chat.lastMessage?.id === messageId
+        ? { ...chat, lastMessage: { ...chat.lastMessage, content } }
+        : chat
+    ));
+  }, []);
+
+  // Remove a message (after delete)
+  const removeMessage = useCallback((chatId: string, messageId: string) => {
+    setMessages(prev => ({
+      ...prev,
+      [chatId]: (prev[chatId] || []).filter((msg) => msg.id !== messageId),
+    }));
+
+    setChats(prev => prev.map(chat =>
+      chat.id === chatId && chat.lastMessage?.id === messageId
+        ? { ...chat, lastMessage: undefined }
+        : chat
+    ));
+  }, []);
 
   // Add a received message
   const addMessage = useCallback((message: Message) => {
@@ -153,6 +189,8 @@ export function ChatProvider({ children, currentUser }: ChatProviderProps) {
     sendMessage,
     addMessage,
     updateMessageStatus,
+    updateMessageContent,
+    removeMessage,
     markChatAsRead,
     fetchChats,
     fetchMessages,

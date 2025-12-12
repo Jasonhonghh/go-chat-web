@@ -3,13 +3,17 @@
 import { useState, useRef, useEffect, FormEvent } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, ImageIcon, MoreVertical, Users } from "lucide-react";
+import { ArrowRight, ImageIcon, MoreVertical, Users, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useChat } from "@/contexts/chat-context";
 import { useAuth } from "@/contexts/auth-context";
+import { useWebSocket } from "@/contexts/websocket-context";
 import { Message } from "@/lib/types";
+import { MessageBubbleEnhanced } from "@/components/message-bubble-enhanced";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 interface MessageBubbleProps {
   message: Message;
@@ -61,10 +65,15 @@ const MessageBubble = ({ message, isCurrentUser }: MessageBubbleProps) => {
 };
 
 export function ChatMain() {
-  const { activeChat, messages: allMessages, sendMessage } = useChat();
+  const { activeChat, messages: allMessages, sendMessage, updateMessageContent, removeMessage } = useChat();
   const { user } = useAuth();
+  const { sendTyping } = useWebSocket();
   const [inputValue, setInputValue] = useState("");
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const messages = activeChat ? allMessages[activeChat.id] || [] : [];
 
@@ -77,8 +86,65 @@ export function ChatMain() {
     e.preventDefault();
     if (!inputValue.trim() || !activeChat) return;
 
-    sendMessage(activeChat.id, inputValue.trim());
+    sendMessage(activeChat.id, inputValue.trim(), replyTo || undefined);
     setInputValue("");
+    setReplyTo(null);
+    
+    // Stop typing indicator
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    sendTyping(activeChat.id, false);
+  };
+
+  const handleInputChange = (value: string) => {
+    setInputValue(value);
+    
+    if (!activeChat) return;
+    
+    // Send typing indicator
+    if (value.trim()) {
+      sendTyping(activeChat.id, true);
+      
+      // Clear previous timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Stop typing after 3 seconds of no input
+      typingTimeoutRef.current = setTimeout(() => {
+        sendTyping(activeChat.id, false);
+      }, 3000);
+    } else {
+      sendTyping(activeChat.id, false);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeChat) return;
+
+    setIsUploading(true);
+    try {
+      const uploadedFile = await api.file.uploadFile(file, 'message');
+      
+      // Send message with file URL
+      sendMessage(activeChat.id, uploadedFile.url, replyTo || undefined);
+      toast.success('文件上传成功');
+    } catch (error) {
+      toast.error('文件上传失败');
+      console.error('File upload error:', error);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const getUserStatus = () => {
@@ -146,10 +212,29 @@ export function ChatMain() {
             </div>
           ) : (
             messages.map((msg) => (
-              <MessageBubble
+              <MessageBubbleEnhanced
                 key={msg.id}
-                message={msg}
+                message={{
+                  message_id: msg.id,
+                  chat_id: msg.chatId,
+                  sender_id: msg.senderId,
+                  sender_name: msg.senderName,
+                  sender_avatar: msg.senderAvatar,
+                  content: msg.content,
+                  type: 'text',
+                  status: msg.status,
+                  created_at: Math.floor(msg.timestamp / 1000),
+                }}
                 isCurrentUser={msg.senderId === user?.id}
+                onReply={(messageId) => setReplyTo(messageId)}
+                onEdit={async (messageId, content) => {
+                  await api.message.editMessage(messageId, content);
+                  updateMessageContent(activeChat.id, messageId, content);
+                }}
+                onDelete={async (messageId) => {
+                  await api.message.deleteMessage(messageId);
+                  removeMessage(activeChat.id, messageId);
+                }}
               />
             ))
           )}
@@ -159,10 +244,24 @@ export function ChatMain() {
 
       {/* Message Input */}
       <form onSubmit={handleSendMessage} className="flex items-center gap-3 border-t p-4">
-        <ImageIcon className="text-muted-foreground h-5 w-5 cursor-pointer" />
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept="image/*,application/pdf,.doc,.docx"
+          onChange={handleFileUpload}
+        />
+        {isUploading ? (
+          <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
+        ) : (
+          <ImageIcon 
+            className="text-muted-foreground h-5 w-5 cursor-pointer hover:text-primary transition-colors" 
+            onClick={() => fileInputRef.current?.click()}
+          />
+        )}
         <Input
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={(e) => handleInputChange(e.target.value)}
           placeholder="Type a message..."
           className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0"
         />
