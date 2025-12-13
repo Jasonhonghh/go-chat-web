@@ -45,6 +45,7 @@ interface MessageBubbleEnhancedProps {
   onDelete?: (messageId: string) => void;
   onReply?: (messageId: string, senderName: string) => void;
   onCopy?: (content: string) => void;
+  highlightTerm?: string;
 }
 
 /**
@@ -120,6 +121,7 @@ export function MessageBubbleEnhanced({
   onDelete,
   onReply,
   onCopy,
+  highlightTerm,
 }: MessageBubbleEnhancedProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(message.content);
@@ -179,6 +181,31 @@ export function MessageBubbleEnhanced({
     if (onReply) {
       onReply(message.message_id, message.sender_name);
     }
+  };
+
+  const renderContent = () => {
+    if (!highlightTerm || !highlightTerm.trim()) {
+      return <p className="text-sm whitespace-pre-wrap">{message.content}</p>;
+    }
+
+    const term = highlightTerm.trim();
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`(${escaped})`, 'gi');
+    const parts = message.content.split(regex);
+
+    return (
+      <p className="text-sm whitespace-pre-wrap">
+        {parts.map((part, index) =>
+          index % 2 === 1 ? (
+            <mark key={index} className="bg-yellow-200 text-inherit">
+              {part}
+            </mark>
+          ) : (
+            <span key={index}>{part}</span>
+          )
+        )}
+      </p>
+    );
   };
 
   return (
@@ -248,7 +275,7 @@ export function MessageBubbleEnhanced({
           ) : (
             <div>
               {/* 消息内容 */}
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              {renderContent()}
 
               {/* 编辑标记 */}
               {message.edited_at && (

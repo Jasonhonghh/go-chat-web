@@ -218,18 +218,18 @@ go-chat-web/
 ## 🚧 Future Enhancements
 
 ### Phase 2 (Planned)
-- [ ] Typing indicators
-- [ ] Message read receipts
-- [ ] Image/file upload
-- [ ] Message search
+- [x] Typing indicators (UI + mock WS)
+- [ ] Message read receipts (backend verification pending)
+- [x] Image/file upload (mock/real API via `api.file.uploadFile`)
+- [x] Message search (UI with highlighting + API backend)
 - [ ] Emoji picker
 - [ ] User profile editing
-- [ ] Create new chats/groups
-- [ ] Add/remove group members
+- [x] Create new chats/groups (UI in sidebar + dialog)
+- [x] Add/remove group members (GroupSettingsDialog)
 
 ### Phase 3 (Advanced)
-- [ ] Message editing/deletion
-- [ ] Reply/threading
+- [x] Message editing/deletion (UI flows wired to `api.message`)
+- [x] Reply/threading (basic inline reply)
 - [ ] Voice messages
 - [ ] Video calls
 - [ ] End-to-end encryption

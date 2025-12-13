@@ -71,7 +71,7 @@ const ChatContact = ({ chat, isActive, onClick }: ChatContactProps) => {
 
 export function ChatSidebar() {
   const [activeTab, setActiveTab] = useState<'private' | 'group'>('private');
-  const { chats, activeChat, setActiveChat, isLoading } = useChat();
+  const { chats, activeChat, setActiveChat, isLoading, fetchChats } = useChat();
   const [openCreateGroup, setOpenCreateGroup] = useReactState(false);
 
   const filteredChats = chats.filter(chat => chat.type === activeTab);
@@ -139,9 +139,10 @@ export function ChatSidebar() {
         onOpenChange={setOpenCreateGroup}
         onCreateGroup={async (groupData) => {
           const group = await api.group.createGroup(groupData);
-          // After creating, refresh chats list
-          // Depending on chat-context implementation, could fetch or optimistic add.
-          // Here we simply close the dialog; chat list refresh should be triggered elsewhere if needed.
+          // Refresh chats list after creation so the new group appears
+          await fetchChats();
+          // Switch to group tab to reveal the new chat
+          setActiveTab('group');
           setOpenCreateGroup(false);
         }}
       />

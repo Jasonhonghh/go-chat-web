@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, FormEvent } from "react";
+import { useState, useRef, useEffect, FormEvent, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { ArrowRight, ImageIcon, MoreVertical, Users, Loader2 } from "lucide-react";
@@ -12,8 +12,15 @@ import { useAuth } from "@/contexts/auth-context";
 import { useWebSocket } from "@/contexts/websocket-context";
 import { Message } from "@/lib/types";
 import { MessageBubbleEnhanced } from "@/components/message-bubble-enhanced";
+import { GroupSettingsDialog } from "@/components/group-settings-dialog";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface MessageBubbleProps {
   message: Message;
@@ -71,11 +78,25 @@ export function ChatMain() {
   const [inputValue, setInputValue] = useState("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<Message[]>([]);
+  const [showGroupSettings, setShowGroupSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const useMock = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+
   const messages = activeChat ? allMessages[activeChat.id] || [] : [];
+
+  const displayedMessages = useMemo(() => {
+    if (!searchQuery.trim()) return messages;
+    if (searchResults.length > 0) return searchResults;
+    return messages.filter((msg) =>
+      msg.content.toLowerCase().includes(searchQuery.trim().toLowerCase())
+    );
+  }, [messages, searchQuery, searchResults]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -124,6 +145,53 @@ export function ChatMain() {
       }
     }
   };
+
+  const performSearch = async (query: string) => {
+    if (!activeChat) return;
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      if (!useMock) {
+        const { items } = await api.message.searchMessages(activeChat.id, query, { limit: 50 });
+        const mapped = items.map((msg) => ({
+          id: msg.message_id,
+          chatId: msg.chat_id,
+          senderId: msg.sender_id,
+          senderName: msg.sender_name,
+          senderAvatar: msg.sender_avatar,
+          content: msg.content,
+          timestamp: msg.created_at * 1000,
+          status: msg.status,
+        } as Message));
+        setSearchResults(mapped);
+      } else {
+        // Fallback to local filter in mock mode
+        setSearchResults(
+          messages.filter((m) => m.content.toLowerCase().includes(query.toLowerCase()))
+        );
+      }
+    } catch (error) {
+      console.error('Message search failed:', error);
+      // Graceful fallback to local filter
+      setSearchResults(
+        messages.filter((m) => m.content.toLowerCase().includes(query.toLowerCase()))
+      );
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      performSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery, activeChat]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -184,7 +252,7 @@ export function ChatMain() {
   return (
     <div className="m-4 flex flex-1 flex-col rounded-lg border shadow-sm">
       {/* Chat Header */}
-      <div className="flex items-center justify-between border-b p-4">
+      <div className="flex items-center justify-between gap-4 border-b p-4">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
             <AvatarImage src={activeChat.avatar} alt={activeChat.name} />
@@ -200,18 +268,46 @@ export function ChatMain() {
             <p className="text-muted-foreground text-sm">{getUserStatus()}</p>
           </div>
         </div>
-        <MoreVertical className="text-muted-foreground h-5 w-5 cursor-pointer" />
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search in chat"
+              className="w-48 pr-10"
+            />
+            {isSearching && (
+              <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+            )}
+          </div>
+          {activeChat.type === 'group' ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowGroupSettings(true)}>
+                  群聊设置
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <MoreVertical className="text-muted-foreground h-5 w-5 cursor-pointer" />
+          )}
+        </div>
       </div>
 
       {/* Messages Area */}
       <ScrollArea className="flex-1 p-6">
         <div className="space-y-4">
-          {messages.length === 0 ? (
+          {displayedMessages.length === 0 ? (
             <div className="text-muted-foreground text-center text-sm">
               No messages yet. Start the conversation!
             </div>
           ) : (
-            messages.map((msg) => (
+            displayedMessages.map((msg) => (
               <MessageBubbleEnhanced
                 key={msg.id}
                 message={{
@@ -235,6 +331,7 @@ export function ChatMain() {
                   await api.message.deleteMessage(messageId);
                   removeMessage(activeChat.id, messageId);
                 }}
+                highlightTerm={searchQuery.trim()}
               />
             ))
           )}
@@ -274,6 +371,48 @@ export function ChatMain() {
           <ArrowRight />
         </Button>
       </form>
+
+      {/* Group Settings Dialog */}
+      {activeChat.type === 'group' && (
+        <GroupSettingsDialog
+          open={showGroupSettings}
+          onOpenChange={setShowGroupSettings}
+          group={{
+            group_id: activeChat.id,
+            chat_id: activeChat.id,
+            name: activeChat.name,
+            description: activeChat.description,
+            avatar_url: activeChat.avatar,
+            owner_id: activeChat.participants[0]?.id || '',
+            members: activeChat.participants.map(p => ({
+              user_id: p.id,
+              name: p.name,
+              avatar_url: p.avatar,
+              role: p.id === activeChat.participants[0]?.id ? 'owner' as const : 'member' as const,
+              joined_at: Date.now() / 1000,
+            })),
+            member_count: activeChat.participants.length,
+            created_at: activeChat.createdAt ? activeChat.createdAt / 1000 : Date.now() / 1000,
+            updated_at: activeChat.updatedAt / 1000,
+          }}
+          onUpdate={async () => {
+            // Refresh chat data after group update
+            if (activeChat) {
+              const { fetchChats } = await import('@/contexts/chat-context');
+              // Note: In production, you'd want to re-fetch the specific chat
+              // For now, we'll rely on WebSocket events to update the state
+            }
+          }}
+          onLeave={() => {
+            // Navigate away from the deleted chat
+            setActiveChat(null);
+          }}
+          onDelete={() => {
+            // Navigate away from the deleted chat
+            setActiveChat(null);
+          }}
+        />
+      )}
     </div>
   );
 }
