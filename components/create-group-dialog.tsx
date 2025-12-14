@@ -80,9 +80,9 @@ export function CreateGroupDialog({
       try {
         const response = await api.user.searchUsers(searchQuery, 1, 10);
         // 过滤掉已选择的成员
-        const selectedIds = selectedMembers.map((m) => m.user_id);
+        const selectedIds = selectedMembers.map((m) => m.id);
         setSearchResults(
-          response.items.filter((user) => !selectedIds.includes(user.user_id))
+          response.items.filter((user) => !selectedIds.includes(user.id))
         );
       } catch (error) {
         toast.error('搜索用户失败');
@@ -99,7 +99,7 @@ export function CreateGroupDialog({
    * 添加成员
    */
   const handleAddMember = (user: User) => {
-    if (!selectedMembers.find((m) => m.user_id === user.user_id)) {
+    if (!selectedMembers.find((m) => m.id === user.id)) {
       setSelectedMembers([...selectedMembers, user]);
       setSearchQuery('');
     }
@@ -109,7 +109,7 @@ export function CreateGroupDialog({
    * 移除成员
    */
   const handleRemoveMember = (userId: string) => {
-    setSelectedMembers(selectedMembers.filter((m) => m.user_id !== userId));
+    setSelectedMembers(selectedMembers.filter((m) => m.id !== userId));
   };
 
   /**
@@ -131,7 +131,7 @@ export function CreateGroupDialog({
       await onCreateGroup({
         name: groupName,
         description: description || undefined,
-        member_ids: selectedMembers.map((m) => m.user_id),
+        member_ids: selectedMembers.map((m) => m.id),
       });
 
       // 重置表单
@@ -229,12 +229,12 @@ export function CreateGroupDialog({
               <div className="mt-2 border rounded-md max-h-48 overflow-y-auto">
                 {searchResults.map((user) => (
                   <div
-                    key={user.user_id}
+                    key={user.id}
                     className="flex items-center justify-between p-3 hover:bg-gray-50 border-b last:border-0"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <Avatar className="w-8 h-8 flex-shrink-0">
-                        <AvatarImage src={user.avatar_url} />
+                        <AvatarImage src={user.avatar} />
                         <AvatarFallback className="text-xs">
                           {getAvatarFallback(user.name)}
                         </AvatarFallback>
@@ -277,18 +277,18 @@ export function CreateGroupDialog({
               <div className="mt-2 flex flex-wrap gap-2">
                 {selectedMembers.map((member) => (
                   <div
-                    key={member.user_id}
+                    key={member.id}
                     className="flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full"
                   >
                     <Avatar className="w-6 h-6">
-                      <AvatarImage src={member.avatar_url} />
+                      <AvatarImage src={member.avatar} />
                       <AvatarFallback className="text-xs">
                         {getAvatarFallback(member.name)}
                       </AvatarFallback>
                     </Avatar>
                     <span className="text-sm">{member.name}</span>
                     <button
-                      onClick={() => handleRemoveMember(member.user_id)}
+                      onClick={() => handleRemoveMember(member.id)}
                       disabled={isCreating}
                       className="ml-1 hover:text-blue-600 disabled:opacity-50"
                     >

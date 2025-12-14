@@ -38,16 +38,15 @@ export function useChatWithWebSocket() {
   const ws = useWebSocket();
 
   const sendMessageWithWebSocket = (chatId: string, content: string) => {
-    // Create optimistic message first
-    chat.sendMessage(chatId, content);
+    const tempId = chat.sendMessage(chatId, content) || `temp-${Date.now()}`;
     
     // Send via WebSocket
     ws.sendEvent({
       type: 'send_message',
       data: {
-        chatId,
+        chat_id: chatId,
         content,
-        timestamp: Date.now(),
+        temp_id: tempId,
       },
     });
   };

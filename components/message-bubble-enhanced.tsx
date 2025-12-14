@@ -138,7 +138,7 @@ export function MessageBubbleEnhanced({
 
     try {
       if (onEdit) {
-        await onEdit(message.message_id, editedContent);
+        await onEdit(message.id, editedContent);
         setIsEditing(false);
         toast.success('消息已编辑');
       }
@@ -165,7 +165,7 @@ export function MessageBubbleEnhanced({
     if (window.confirm('确定删除此消息吗？')) {
       try {
         if (onDelete) {
-          await onDelete(message.message_id);
+          await onDelete(message.id);
           toast.success('消息已删除');
         }
       } catch (error) {
@@ -179,7 +179,7 @@ export function MessageBubbleEnhanced({
    */
   const handleReply = () => {
     if (onReply) {
-      onReply(message.message_id, message.sender_name);
+      onReply(message.id, message.senderName);
     }
   };
 
@@ -215,9 +215,9 @@ export function MessageBubbleEnhanced({
       {/* 头像 */}
       {!isCurrentUser && (
         <Avatar className="w-8 h-8 flex-shrink-0">
-          <AvatarImage src={message.sender_avatar} />
+          <AvatarImage src={message.senderAvatar} />
           <AvatarFallback className="text-xs">
-            {getAvatarFallback(message.sender_name)}
+            {getAvatarFallback(message.senderName)}
           </AvatarFallback>
         </Avatar>
       )}
@@ -229,7 +229,7 @@ export function MessageBubbleEnhanced({
         {/* 发送者名称（非当前用户显示） */}
         {!isCurrentUser && (
           <div className="text-sm font-medium text-gray-700 mb-1">
-            {message.sender_name}
+            {message.senderName}
           </div>
         )}
 
@@ -278,7 +278,7 @@ export function MessageBubbleEnhanced({
               {renderContent()}
 
               {/* 编辑标记 */}
-              {message.edited_at && (
+              {message.editedAt && (
                 <div className="text-xs opacity-70 mt-1">
                   (已编辑)
                 </div>
@@ -293,7 +293,7 @@ export function MessageBubbleEnhanced({
             isCurrentUser ? 'text-gray-500' : 'text-gray-400'
           }`}
         >
-          <span>{formatTime(message.created_at)}</span>
+          <span>{formatTime(message.createdAt)}</span>
           {isCurrentUser && getStatusIcon(message.status)}
         </div>
       </div>

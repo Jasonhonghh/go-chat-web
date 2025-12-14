@@ -20,18 +20,31 @@
 export type UserStatus = 'online' | 'offline' | 'away' | 'dnd';
 
 /**
- * 用户数据模型
+ * 用户数据模型 (UI)
  */
 export interface User {
-  user_id: string;           // 用户 ID
-  email: string;             // 邮箱
-  name: string;              // 昵称
-  avatar_url?: string;       // 头像 URL
-  status: UserStatus;        // 在线状态
-  bio?: string;              // 个人简介
-  last_seen?: number;        // 最后在线时间戳
-  created_at?: number;       // 创建时间戳
-  updated_at?: number;       // 更新时间戳
+  id: string;
+  email: string;
+  name: string;
+  avatar?: string;
+  status: UserStatus;
+  bio?: string;
+  lastSeen?: number;
+}
+
+/**
+ * 用户数据模型 (API)
+ */
+export interface ApiUser {
+  user_id: string;
+  email: string;
+  name: string;
+  avatar_url?: string;
+  status: UserStatus;
+  bio?: string;
+  last_seen?: number;
+  created_at?: number;
+  updated_at?: number;
 }
 
 // ============================================================================
@@ -44,19 +57,35 @@ export interface User {
 export type ChatType = 'private' | 'group';
 
 /**
- * 聊天数据模型
+ * 聊天数据模型 (UI)
  */
 export interface Chat {
-  chat_id: string;           // 聊天 ID
-  type: ChatType;            // 聊天类型
-  name: string;              // 聊天名称
-  avatar_url?: string;       // 头像 URL
-  description?: string;      // 描述（仅群聊）
-  participants: User[];      // 参与者列表
-  last_message?: Message;    // 最新消息
-  unread_count: number;      // 未读消息计数
-  created_at?: number;       // 创建时间戳
-  updated_at?: number;       // 更新时间戳
+  id: string;
+  type: ChatType;
+  name: string;
+  avatar?: string;
+  description?: string;
+  participants: User[];
+  lastMessage?: Message;
+  unreadCount: number;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+/**
+ * 聊天数据模型 (API)
+ */
+export interface ApiChat {
+  chat_id: string;
+  type: ChatType;
+  name: string;
+  avatar_url?: string;
+  description?: string;
+  participants: ApiUser[];
+  last_message?: ApiMessage;
+  unread_count: number;
+  created_at?: number;
+  updated_at?: number;
 }
 
 // ============================================================================
@@ -78,20 +107,37 @@ export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
 export type MessageType = 'text' | 'image' | 'file' | 'audio' | 'video';
 
 /**
- * 消息数据模型
+ * 消息数据模型 (UI)
  */
 export interface Message {
-  message_id: string;        // 消息 ID
-  chat_id: string;           // 聊天 ID
-  sender_id: string;         // 发送者 ID
-  sender_name: string;       // 发送者名称
-  sender_avatar?: string;    // 发送者头像
-  content: string;           // 消息内容
-  type: MessageType;         // 消息类型
-  status: MessageStatus;     // 消息状态
-  reply_to?: string;         // 回复的消息 ID（用于线程化消息）
-  edited_at?: number;        // 编辑时间戳
-  created_at: number;        // 创建时间戳
+  id: string;
+  chatId: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar?: string;
+  content: string;
+  type: MessageType;
+  status: MessageStatus;
+  replyTo?: string;
+  editedAt?: number;
+  createdAt: number;
+}
+
+/**
+ * 消息数据模型 (API)
+ */
+export interface ApiMessage {
+  message_id: string;
+  chat_id: string;
+  sender_id: string;
+  sender_name: string;
+  sender_avatar?: string;
+  content: string;
+  type: MessageType;
+  status: MessageStatus;
+  reply_to?: string;
+  edited_at?: number;
+  created_at: number;
 }
 
 // ============================================================================
@@ -107,6 +153,17 @@ export type GroupMemberRole = 'owner' | 'admin' | 'member';
  * 群成员数据模型
  */
 export interface GroupMember {
+  userId: string;
+  name: string;
+  avatar?: string;
+  role: GroupMemberRole;
+  joinedAt?: number;
+}
+
+/**
+ * 群成员数据模型 (API)
+ */
+export interface ApiGroupMember {
   user_id: string;
   name: string;
   avatar_url?: string;
@@ -115,19 +172,35 @@ export interface GroupMember {
 }
 
 /**
- * 群聊数据模型
+ * 群聊数据模型 (UI)
  */
 export interface Group {
-  group_id: string;          // 群聊 ID
-  chat_id: string;           // 关联的聊天 ID
-  name: string;              // 群名称
-  description?: string;      // 群描述
-  avatar_url?: string;       // 群头像 URL
-  owner_id: string;          // 群主 ID
-  members: GroupMember[];    // 成员列表
-  member_count: number;      // 成员数量
-  created_at?: number;       // 创建时间戳
-  updated_at?: number;       // 更新时间戳
+  id: string;
+  chatId: string;
+  name: string;
+  description?: string;
+  avatar?: string;
+  ownerId: string;
+  members: GroupMember[];
+  memberCount: number;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+/**
+ * 群聊数据模型 (API)
+ */
+export interface ApiGroup {
+  group_id: string;
+  chat_id: string;
+  name: string;
+  description?: string;
+  avatar_url?: string;
+  owner_id: string;
+  members: ApiGroupMember[];
+  member_count: number;
+  created_at?: number;
+  updated_at?: number;
 }
 
 // ============================================================================
@@ -146,8 +219,8 @@ export interface TokenData {
 /**
  * 登录响应
  */
-export interface LoginResponse extends TokenData {
-  user: User;
+export interface ApiLoginResponse extends TokenData {
+  user: ApiUser;
 }
 
 /**
@@ -209,17 +282,17 @@ export interface PaginatedResponse<T> {
 /**
  * 聊天列表响应
  */
-export interface ChatListResponse extends PaginatedResponse<Chat> {}
+export interface ApiChatListResponse extends PaginatedResponse<ApiChat> {}
 
 /**
  * 消息列表响应
  */
-export interface MessageListResponse extends PaginatedResponse<Message> {}
+export interface ApiMessageListResponse extends PaginatedResponse<ApiMessage> {}
 
 /**
  * 用户搜索响应
  */
-export interface UserSearchResponse extends PaginatedResponse<User> {}
+export interface ApiUserSearchResponse extends PaginatedResponse<ApiUser> {}
 
 // ============================================================================
 // 文件上传类型
@@ -283,6 +356,7 @@ export interface SendMessageEvent {
     content: string;
     type?: MessageType;        // 默认: text
     reply_to?: string;         // 可选：回复的消息 ID
+    temp_id?: string;
   };
 }
 
@@ -291,7 +365,7 @@ export interface SendMessageEvent {
  */
 export interface NewMessageEvent {
   type: 'new_message';
-  data: Message;
+  data: ApiMessage;
 }
 
 /**

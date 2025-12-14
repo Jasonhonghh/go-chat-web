@@ -1,332 +1,277 @@
 import MockAdapter from "axios-mock-adapter"
-import { api } from "./api"
-import { User, Chat, Message } from "./types"
+import { axiosInstance } from "./api"
+import { ApiUser, ApiChat, ApiMessage, APIResponse, ApiChatListResponse, ApiMessageListResponse } from "./types"
 
 let started = false
 
 // Mock data
-const mockUsers: User[] = [
+const mockUsers: ApiUser[] = [
   {
-    id: "user-1",
+    user_id: "user-1",
     name: "Current User",
     email: "user@example.com",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=current",
+    avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=current",
     status: "online",
+    last_seen: Math.floor(Date.now() / 1000),
   },
   {
-    id: "user-2",
+    user_id: "user-2",
     name: "Alice Johnson",
     email: "alice@example.com",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
+    avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
     status: "online",
+    last_seen: Math.floor(Date.now() / 1000),
   },
   {
-    id: "user-3",
+    user_id: "user-3",
     name: "Bob Smith",
     email: "bob@example.com",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bob",
+    avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=bob",
     status: "offline",
-    lastSeen: Date.now() - 3600000,
+    last_seen: Math.floor(Date.now() / 1000) - 3600,
   },
   {
-    id: "user-4",
+    user_id: "user-4",
     name: "Carol White",
     email: "carol@example.com",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carol",
+    avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=carol",
     status: "online",
+    last_seen: Math.floor(Date.now() / 1000),
   },
   {
-    id: "user-5",
+    user_id: "user-5",
     name: "David Brown",
     email: "david@example.com",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=david",
+    avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=david",
     status: "offline",
-    lastSeen: Date.now() - 7200000,
+    last_seen: Math.floor(Date.now() / 1000) - 7200,
   },
 ];
 
-const mockChats: Chat[] = [
+const mockChats: ApiChat[] = [
   {
-    id: "chat-1",
+    chat_id: "chat-1",
     type: "private",
     name: "Alice Johnson",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
+    avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
     participants: [mockUsers[0], mockUsers[1]],
-    lastMessage: {
-      id: "msg-1-3",
-      chatId: "chat-1",
-      senderId: "user-2",
-      senderName: "Alice Johnson",
+    last_message: {
+      message_id: "msg-1-3",
+      chat_id: "chat-1",
+      sender_id: "user-2",
+      sender_name: "Alice Johnson",
       content: "Sounds great! Talk to you later.",
-      timestamp: Date.now() - 300000,
+      type: "text",
+      created_at: Date.now() - 300000,
       status: "read",
     },
-    unreadCount: 0,
-    updatedAt: Date.now() - 300000,
+    unread_count: 0,
+    updated_at: Date.now() - 300000,
   },
   {
-    id: "chat-2",
+    chat_id: "chat-2",
     type: "private",
     name: "Bob Smith",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bob",
+    avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=bob",
     participants: [mockUsers[0], mockUsers[2]],
-    lastMessage: {
-      id: "msg-2-2",
-      chatId: "chat-2",
-      senderId: "user-3",
-      senderName: "Bob Smith",
+    last_message: {
+      message_id: "msg-2-2",
+      chat_id: "chat-2",
+      sender_id: "user-3",
+      sender_name: "Bob Smith",
       content: "Let me know when you're available",
-      timestamp: Date.now() - 3600000,
+      type: "text",
+      created_at: Date.now() - 3600000,
       status: "delivered",
     },
-    unreadCount: 2,
-    updatedAt: Date.now() - 3600000,
+    unread_count: 2,
+    updated_at: Date.now() - 3600000,
   },
   {
-    id: "chat-3",
+    chat_id: "chat-3",
     type: "group",
     name: "Project Team",
-    avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=project",
+    avatar_url: "https://api.dicebear.com/7.x/shapes/svg?seed=project",
     participants: [mockUsers[0], mockUsers[1], mockUsers[3]],
-    lastMessage: {
-      id: "msg-3-5",
-      chatId: "chat-3",
-      senderId: "user-4",
-      senderName: "Carol White",
+    last_message: {
+      message_id: "msg-3-5",
+      chat_id: "chat-3",
+      sender_id: "user-4",
+      sender_name: "Carol White",
       content: "I'll prepare the presentation",
-      timestamp: Date.now() - 1800000,
+      type: "text",
+      created_at: Date.now() - 1800000,
       status: "read",
     },
-    unreadCount: 0,
-    updatedAt: Date.now() - 1800000,
-  },
-  {
-    id: "chat-4",
-    type: "group",
-    name: "Design Discussion",
-    avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=design",
-    participants: [mockUsers[0], mockUsers[2], mockUsers[3], mockUsers[4]],
-    lastMessage: {
-      id: "msg-4-3",
-      chatId: "chat-4",
-      senderId: "user-5",
-      senderName: "David Brown",
-      content: "The mockups look fantastic!",
-      timestamp: Date.now() - 7200000,
-      status: "read",
-    },
-    unreadCount: 5,
-    updatedAt: Date.now() - 7200000,
-  },
-  {
-    id: "chat-5",
-    type: "private",
-    name: "Carol White",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carol",
-    participants: [mockUsers[0], mockUsers[3]],
-    lastMessage: {
-      id: "msg-5-1",
-      chatId: "chat-5",
-      senderId: "user-1",
-      senderName: "Current User",
-      content: "Thanks for the update!",
-      timestamp: Date.now() - 86400000,
-      status: "read",
-    },
-    unreadCount: 0,
-    updatedAt: Date.now() - 86400000,
+    unread_count: 0,
+    updated_at: Date.now() - 1800000,
   },
 ];
 
-const mockMessages: Record<string, Message[]> = {
+const mockMessages: Record<string, ApiMessage[]> = {
   "chat-1": [
     {
-      id: "msg-1-1",
-      chatId: "chat-1",
-      senderId: "user-1",
-      senderName: "Current User",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=current",
+      message_id: "msg-1-1",
+      chat_id: "chat-1",
+      sender_id: "user-1",
+      sender_name: "Current User",
+      sender_avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=current",
       content: "Hey Alice! How's the project going?",
-      timestamp: Date.now() - 900000,
+      type: "text",
+      created_at: Date.now() - 900000,
       status: "read",
     },
     {
-      id: "msg-1-2",
-      chatId: "chat-1",
-      senderId: "user-2",
-      senderName: "Alice Johnson",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
+      message_id: "msg-1-2",
+      chat_id: "chat-1",
+      sender_id: "user-2",
+      sender_name: "Alice Johnson",
+      sender_avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
       content: "Hi! It's going well. Just finished the design phase.",
-      timestamp: Date.now() - 600000,
+      type: "text",
+      created_at: Date.now() - 600000,
       status: "read",
     },
     {
-      id: "msg-1-3",
-      chatId: "chat-1",
-      senderId: "user-2",
-      senderName: "Alice Johnson",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
+      message_id: "msg-1-3",
+      chat_id: "chat-1",
+      sender_id: "user-2",
+      sender_name: "Alice Johnson",
+      sender_avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
       content: "Sounds great! Talk to you later.",
-      timestamp: Date.now() - 300000,
+      type: "text",
+      created_at: Date.now() - 300000,
       status: "read",
     },
   ],
   "chat-2": [
     {
-      id: "msg-2-1",
-      chatId: "chat-2",
-      senderId: "user-1",
-      senderName: "Current User",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=current",
+      message_id: "msg-2-1",
+      chat_id: "chat-2",
+      sender_id: "user-1",
+      sender_name: "Current User",
+      sender_avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=current",
       content: "Bob, did you review the documents?",
-      timestamp: Date.now() - 7200000,
+      type: "text",
+      created_at: Date.now() - 7200000,
       status: "read",
     },
     {
-      id: "msg-2-2",
-      chatId: "chat-2",
-      senderId: "user-3",
-      senderName: "Bob Smith",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bob",
+      message_id: "msg-2-2",
+      chat_id: "chat-2",
+      sender_id: "user-3",
+      sender_name: "Bob Smith",
+      sender_avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bob",
       content: "Let me know when you're available",
-      timestamp: Date.now() - 3600000,
+      type: "text",
+      created_at: Date.now() - 3600000,
       status: "delivered",
     },
   ],
   "chat-3": [
     {
-      id: "msg-3-1",
-      chatId: "chat-3",
-      senderId: "user-1",
-      senderName: "Current User",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=current",
+      message_id: "msg-3-1",
+      chat_id: "chat-3",
+      sender_id: "user-1",
+      sender_name: "Current User",
+      sender_avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=current",
       content: "Team, let's schedule a meeting for next week",
-      timestamp: Date.now() - 5400000,
-      status: "read",
-    },
-    {
-      id: "msg-3-2",
-      chatId: "chat-3",
-      senderId: "user-2",
-      senderName: "Alice Johnson",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
-      content: "I'm available Monday and Wednesday",
-      timestamp: Date.now() - 3600000,
-      status: "read",
-    },
-    {
-      id: "msg-3-3",
-      chatId: "chat-3",
-      senderId: "user-4",
-      senderName: "Carol White",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carol",
-      content: "Wednesday works for me too",
-      timestamp: Date.now() - 2700000,
-      status: "read",
-    },
-    {
-      id: "msg-3-4",
-      chatId: "chat-3",
-      senderId: "user-1",
-      senderName: "Current User",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=current",
-      content: "Great! Wednesday at 2 PM then?",
-      timestamp: Date.now() - 2400000,
-      status: "read",
-    },
-    {
-      id: "msg-3-5",
-      chatId: "chat-3",
-      senderId: "user-4",
-      senderName: "Carol White",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carol",
-      content: "I'll prepare the presentation",
-      timestamp: Date.now() - 1800000,
-      status: "read",
-    },
-  ],
-  "chat-4": [
-    {
-      id: "msg-4-1",
-      chatId: "chat-4",
-      senderId: "user-3",
-      senderName: "Bob Smith",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bob",
-      content: "I've updated the design mockups",
-      timestamp: Date.now() - 10800000,
-      status: "read",
-    },
-    {
-      id: "msg-4-2",
-      chatId: "chat-4",
-      senderId: "user-4",
-      senderName: "Carol White",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carol",
-      content: "Let me take a look",
-      timestamp: Date.now() - 9000000,
-      status: "read",
-    },
-    {
-      id: "msg-4-3",
-      chatId: "chat-4",
-      senderId: "user-5",
-      senderName: "David Brown",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=david",
-      content: "The mockups look fantastic!",
-      timestamp: Date.now() - 7200000,
-      status: "read",
-    },
-  ],
-  "chat-5": [
-    {
-      id: "msg-5-1",
-      chatId: "chat-5",
-      senderId: "user-1",
-      senderName: "Current User",
-      senderAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=current",
-      content: "Thanks for the update!",
-      timestamp: Date.now() - 86400000,
+      type: "text",
+      created_at: Date.now() - 5400000,
       status: "read",
     },
   ],
 };
 
+function success<T>(data: T): [number, APIResponse<T>] {
+  return [200, {
+    code: 0,
+    message: "success",
+    data,
+    timestamp: Date.now(),
+  }];
+}
+
 export function enableApiMock() {
   if (started) return
   started = true
 
-  const mock = new MockAdapter(api, { delayResponse: 500 })
+  const mock = new MockAdapter(axiosInstance, { delayResponse: 500 })
 
-  // 拦截 POST {BASE_URL}/login
-  mock.onPost("/login").reply((config) => {
+  // Login
+  mock.onPost("/auth/login").reply((config) => {
     const { email, password } = JSON.parse(config.data || "{}")
 
     if (!email || !password) {
-      return [400, { message: "Email and password are required." }]
+      return [400, { code: 400, message: "Email and password are required." }]
     }
-    // 简单规则：密码不为 password123 则失败
     if (password !== "password123") {
-      return [401, { message: "Invalid credentials" }]
+      return [401, { code: 401, message: "Invalid credentials" }]
     }
 
-    // 返回模拟 token
-    return [200, { token: "mock-token-123" }]
+    return success({
+      access_token: "mock-access-token",
+      refresh_token: "mock-refresh-token",
+      expires_in: 3600,
+      user: mockUsers[0],
+    })
   })
 
   // Get user profile
-  mock.onGet("/user/profile").reply(() => {
-    return [200, mockUsers[0]]
+  mock.onGet("/users/profile").reply(() => {
+    return success(mockUsers[0])
   })
 
   // Get chats list
-  mock.onGet("/chats").reply(() => {
-    return [200, mockChats]
+  mock.onGet("/chats").reply((config) => {
+    const response: ApiChatListResponse = {
+      items: mockChats,
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: mockChats.length,
+      }
+    };
+    return success(response);
   })
 
   // Get messages for a specific chat
-  mock.onGet(/\/messages\/chat-\d+/).reply((config) => {
-    const chatId = config.url?.split("/").pop()
-    const messages = chatId ? mockMessages[chatId] || [] : []
-    return [200, messages]
+  // URL pattern: /chats/{chatId}/messages
+  mock.onGet(/\/chats\/[\w-]+\/messages/).reply((config) => {
+    // Extract chatId from URL
+    const match = config.url?.match(/\/chats\/([\w-]+)\/messages/);
+    const chatId = match ? match[1] : "";
+    const messages = chatId ? mockMessages[chatId] || [] : [];
+    
+    const response: ApiMessageListResponse = {
+      items: messages,
+      pagination: {
+        page: 1,
+        limit: 100,
+        total: messages.length,
+      }
+    };
+    return success(response);
   })
+  
+  // Send message
+  mock.onPost(/\/chats\/[\w-]+\/messages/).reply((config) => {
+    const match = config.url?.match(/\/chats\/([\w-]+)\/messages/);
+    const chatId = match ? match[1] : "";
+    const data = JSON.parse(config.data || "{}");
+    
+    const newMessage: ApiMessage = {
+      message_id: `msg-${Date.now()}`,
+      chat_id: chatId,
+      sender_id: mockUsers[0].user_id,
+      sender_name: mockUsers[0].name,
+      sender_avatar: mockUsers[0].avatar_url,
+      content: data.content,
+      type: "text",
+      status: "sent",
+      created_at: Date.now(),
+    };
+    
+    return success(newMessage);
+  });
 }

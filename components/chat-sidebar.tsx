@@ -50,7 +50,7 @@ const ChatContact = ({ chat, isActive, onClick }: ChatContactProps) => {
         <div className="flex items-center justify-between gap-2">
           <span className="font-medium truncate">{chat.name}</span>
           <span className="text-muted-foreground text-xs whitespace-nowrap">
-            {chat.lastMessage ? formatTimestamp(chat.lastMessage.timestamp) : ''}
+            {chat.lastMessage ? formatTimestamp(chat.lastMessage.createdAt) : ''}
           </span>
         </div>
         <div className="text-muted-foreground flex items-center justify-between text-sm gap-2">

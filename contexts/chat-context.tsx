@@ -10,7 +10,7 @@ interface ChatContextType {
   activeChat: Chat | null;
   isLoading: boolean;
   setActiveChat: (chat: Chat | null) => void;
-  sendMessage: (chatId: string, content: string, replyTo?: string) => void;
+  sendMessage: (chatId: string, content: string, replyTo?: string) => string | undefined;
   addMessage: (message: Message) => void;
   updateMessageStatus: (messageId: string, status: Message['status']) => void;
   updateMessageContent: (chatId: string, messageId: string, content: string) => void;
@@ -37,8 +37,8 @@ export function ChatProvider({ children, currentUser }: ChatProviderProps) {
   const fetchChats = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data } = await api.chat.getChats({ page: 1, limit: 50, sort: 'updated_at:desc' });
-      setChats(data?.items ?? []);
+      const { items } = await api.chat.getChats({ page: 1, limit: 50, sort: 'updated_at:desc' });
+      setChats(items ?? []);
     } catch (error) {
       console.error('Failed to fetch chats:', error);
     } finally {
@@ -49,10 +49,10 @@ export function ChatProvider({ children, currentUser }: ChatProviderProps) {
   // Fetch messages for a specific chat
   const fetchMessages = useCallback(async (chatId: string) => {
     try {
-      const { data } = await api.message.getMessages(chatId, { page: 1, limit: 100, sort: 'created_at:asc' });
+      const { items } = await api.message.getMessages(chatId, { page: 1, limit: 100, sort: 'created_at:asc' });
       setMessages(prev => ({
         ...prev,
-        [chatId]: data?.items ?? [],
+        [chatId]: items ?? [],
       }));
     } catch (error) {
       console.error(`Failed to fetch messages for chat ${chatId}:`, error);
@@ -61,7 +61,7 @@ export function ChatProvider({ children, currentUser }: ChatProviderProps) {
 
   // Send a new message (optimistic update)
   const sendMessage = useCallback((chatId: string, content: string, replyTo?: string) => {
-    if (!currentUser) return;
+    if (!currentUser) return undefined;
     
     const tempId = `temp-${Date.now()}`;
     const newMessage: Message = {
@@ -71,8 +71,9 @@ export function ChatProvider({ children, currentUser }: ChatProviderProps) {
       senderName: currentUser.name,
       senderAvatar: currentUser.avatar,
       content,
-      timestamp: Date.now(),
+      createdAt: Date.now(),
       status: 'sending',
+      type: 'text',
     };
 
     // Optimistic update
@@ -92,6 +93,7 @@ export function ChatProvider({ children, currentUser }: ChatProviderProps) {
     api.message.sendMessage(chatId, { content, type: 'text', reply_to: replyTo }).catch((error) => {
       console.error('Failed to send message:', error);
     });
+    return tempId;
   }, [currentUser]);
   // Update message content (after edit)
   const updateMessageContent = useCallback((chatId: string, messageId: string, content: string) => {
@@ -142,7 +144,7 @@ export function ChatProvider({ children, currentUser }: ChatProviderProps) {
         };
       }
       return chat;
-    }).sort((a, b) => b.updatedAt - a.updatedAt));
+    }).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)));
   }, [activeChat]);
 
   // Update message status

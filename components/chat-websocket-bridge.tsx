@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useWebSocket } from '@/contexts/websocket-context';
 import { useChat } from '@/contexts/chat-context';
 import { useAuth } from '@/contexts/auth-context';
+import { mapMessage } from '@/lib/api';
 
 /**
  * Component that bridges WebSocket events with Chat state management
@@ -16,15 +17,16 @@ export function ChatWebSocketBridge() {
   useEffect(() => {
     // Listen for new messages
     const unsubscribeMessages = onNewMessage((event) => {
+      const message = mapMessage(event.data);
       // Only add message if it's from another user or confirmed from server
-      if (event.data.senderId !== user?.id || event.data.id.startsWith('msg-')) {
-        addMessage(event.data);
+      if (message.senderId !== user?.id || message.id.startsWith('msg-')) {
+        addMessage(message);
       }
     });
 
     // Listen for message status updates
     const unsubscribeStatus = onMessageStatus((event) => {
-      updateMessageStatus(event.data.messageId, event.data.status);
+      updateMessageStatus(event.data.message_id, event.data.status);
     });
 
     // Listen for user status changes

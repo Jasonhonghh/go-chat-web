@@ -56,7 +56,7 @@ const MessageBubble = ({ message, isCurrentUser }: MessageBubbleProps) => {
           <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
         </div>
         <span className="text-muted-foreground text-xs px-1">
-          {formatTime(message.timestamp)}
+          {formatTime(message.createdAt)}
           {isCurrentUser && message.status && (
             <span className="ml-1">
               {message.status === 'sending' && '⏳'}
@@ -72,7 +72,7 @@ const MessageBubble = ({ message, isCurrentUser }: MessageBubbleProps) => {
 };
 
 export function ChatMain() {
-  const { activeChat, messages: allMessages, sendMessage, updateMessageContent, removeMessage } = useChat();
+  const { activeChat, setActiveChat, messages: allMessages, sendMessage, updateMessageContent, removeMessage, fetchChats } = useChat();
   const { user } = useAuth();
   const { sendTyping } = useWebSocket();
   const [inputValue, setInputValue] = useState("");
@@ -158,17 +158,7 @@ export function ChatMain() {
     try {
       if (!useMock) {
         const { items } = await api.message.searchMessages(activeChat.id, query, { limit: 50 });
-        const mapped = items.map((msg) => ({
-          id: msg.message_id,
-          chatId: msg.chat_id,
-          senderId: msg.sender_id,
-          senderName: msg.sender_name,
-          senderAvatar: msg.sender_avatar,
-          content: msg.content,
-          timestamp: msg.created_at * 1000,
-          status: msg.status,
-        } as Message));
-        setSearchResults(mapped);
+        setSearchResults(items);
       } else {
         // Fallback to local filter in mock mode
         setSearchResults(
@@ -310,17 +300,7 @@ export function ChatMain() {
             displayedMessages.map((msg) => (
               <MessageBubbleEnhanced
                 key={msg.id}
-                message={{
-                  message_id: msg.id,
-                  chat_id: msg.chatId,
-                  sender_id: msg.senderId,
-                  sender_name: msg.senderName,
-                  sender_avatar: msg.senderAvatar,
-                  content: msg.content,
-                  type: 'text',
-                  status: msg.status,
-                  created_at: Math.floor(msg.timestamp / 1000),
-                }}
+                message={msg}
                 isCurrentUser={msg.senderId === user?.id}
                 onReply={(messageId) => setReplyTo(messageId)}
                 onEdit={async (messageId, content) => {
@@ -378,27 +358,27 @@ export function ChatMain() {
           open={showGroupSettings}
           onOpenChange={setShowGroupSettings}
           group={{
-            group_id: activeChat.id,
-            chat_id: activeChat.id,
+            id: activeChat.id,
+            chatId: activeChat.id,
             name: activeChat.name,
             description: activeChat.description,
-            avatar_url: activeChat.avatar,
-            owner_id: activeChat.participants[0]?.id || '',
+            avatar: activeChat.avatar,
+            ownerId: activeChat.participants[0]?.id || '',
             members: activeChat.participants.map(p => ({
-              user_id: p.id,
+              userId: p.id,
               name: p.name,
-              avatar_url: p.avatar,
+              avatar: p.avatar,
               role: p.id === activeChat.participants[0]?.id ? 'owner' as const : 'member' as const,
-              joined_at: Date.now() / 1000,
+              joinedAt: Date.now() / 1000,
             })),
-            member_count: activeChat.participants.length,
-            created_at: activeChat.createdAt ? activeChat.createdAt / 1000 : Date.now() / 1000,
-            updated_at: activeChat.updatedAt / 1000,
+            memberCount: activeChat.participants.length,
+            createdAt: activeChat.createdAt,
+            updatedAt: activeChat.updatedAt,
           }}
           onUpdate={async () => {
             // Refresh chat data after group update
             if (activeChat) {
-              const { fetchChats } = await import('@/contexts/chat-context');
+              await fetchChats();
               // Note: In production, you'd want to re-fetch the specific chat
               // For now, we'll rely on WebSocket events to update the state
             }

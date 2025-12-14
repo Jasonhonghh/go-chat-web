@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode, useCa
 import { io, Socket } from 'socket.io-client';
 import { WebSocketEvent, NewMessageEvent, UserStatusEvent, MessageStatusEvent } from '@/lib/types';
 import { mockWebSocketServer } from '@/lib/mock-websocket';
+import { mapMessage } from '@/lib/api';
 
 interface WebSocketContextType {
   socket: Socket | null;
@@ -78,9 +79,9 @@ export function WebSocketProvider({
     if (useMock) {
       if (event.type === 'send_message') {
         mockWebSocketServer.sendMessage(
-          event.data.chatId,
+          event.data.chat_id,
           event.data.content,
-          `temp-${event.data.timestamp}`
+          event.data.temp_id || `temp-${Date.now()}`
         );
       }
     } else if (socket && isConnected) {
@@ -90,41 +91,43 @@ export function WebSocketProvider({
 
   const onNewMessage = useCallback((callback: (event: NewMessageEvent) => void) => {
     if (useMock) {
-      const handler = (data: NewMessageEvent['data']) => {
+      const handler = (data: any) => {
+        // Mock server emits snake_case data
+        // We pass it as is because NewMessageEvent.data is ApiMessage
         callback({ type: 'new_message', data });
       };
-      mockWebSocketServer.on('new_message', handler as any);
+      mockWebSocketServer.on('new_message', handler);
       return () => {
-        mockWebSocketServer.off('new_message', handler as any);
+        mockWebSocketServer.off('new_message', handler);
       };
     }
-    
-    if (!socket) return () => {};
-    
-    const handler = (data: NewMessageEvent['data']) => {
-      callback({ type: 'new_message', data });
-    };
-    
-    socket.on('new_message', handler);
-    return () => {
-      socket.off('new_message', handler);
-    };
+
+    if (socket) {
+      const handler = (data: any) => {
+        callback({ type: 'new_message', data });
+      };
+      socket.on('new_message', handler);
+      return () => {
+        socket.off('new_message', handler);
+      };
+    }
+    return () => {};
   }, [socket, useMock]);
 
   const onUserStatus = useCallback((callback: (event: UserStatusEvent) => void) => {
     if (useMock) {
-      const handler = (data: UserStatusEvent['data']) => {
+      const handler = (data: any) => {
         callback({ type: 'user_status', data });
       };
-      mockWebSocketServer.on('user_status', handler as any);
+      mockWebSocketServer.on('user_status', handler);
       return () => {
-        mockWebSocketServer.off('user_status', handler as any);
+        mockWebSocketServer.off('user_status', handler);
       };
     }
     
     if (!socket) return () => {};
     
-    const handler = (data: UserStatusEvent['data']) => {
+    const handler = (data: any) => {
       callback({ type: 'user_status', data });
     };
     
@@ -136,18 +139,18 @@ export function WebSocketProvider({
 
   const onMessageStatus = useCallback((callback: (event: MessageStatusEvent) => void) => {
     if (useMock) {
-      const handler = (data: MessageStatusEvent['data']) => {
+      const handler = (data: any) => {
         callback({ type: 'message_status', data });
       };
-      mockWebSocketServer.on('message_status', handler as any);
+      mockWebSocketServer.on('message_status', handler);
       return () => {
-        mockWebSocketServer.off('message_status', handler as any);
+        mockWebSocketServer.off('message_status', handler);
       };
     }
     
     if (!socket) return () => {};
     
-    const handler = (data: MessageStatusEvent['data']) => {
+    const handler = (data: any) => {
       callback({ type: 'message_status', data });
     };
     

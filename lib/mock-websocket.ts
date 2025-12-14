@@ -1,12 +1,12 @@
 'use client';
 
-import { Message, NewMessageEvent, UserStatusEvent } from './types';
+import { ApiMessage, NewMessageEvent, UserStatusEvent } from './types';
 
-type EventCallback = (event: NewMessageEvent | UserStatusEvent) => void;
+type EventCallback = (data: any) => void;
 
 class MockWebSocketServer {
   private listeners: Map<string, Set<EventCallback>> = new Map();
-  private messageQueue: Message[] = [];
+  private messageQueue: ApiMessage[] = [];
   private isEnabled = false;
 
   enable() {
@@ -36,7 +36,7 @@ class MockWebSocketServer {
   emit(event: string, data: any) {
     const listeners = this.listeners.get(event);
     if (listeners) {
-      listeners.forEach(callback => callback({ type: event, data } as any));
+      listeners.forEach(callback => callback(data));
     }
   }
 
@@ -44,21 +44,23 @@ class MockWebSocketServer {
   sendMessage(chatId: string, content: string, tempId: string) {
     // Simulate network delay
     setTimeout(() => {
-      const newMessage: Message = {
-        id: `msg-${Date.now()}`,
-        chatId,
-        senderId: 'user-1',
-        senderName: 'Current User',
-        senderAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=current',
+      const newMessage: ApiMessage = {
+        message_id: `msg-${Date.now()}`,
+        chat_id: chatId,
+        sender_id: 'user-1',
+        sender_name: 'Current User',
+        sender_avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=current',
         content,
-        timestamp: Date.now(),
+        type: 'text',
+        created_at: Date.now(),
         status: 'sent',
       };
 
       // Update message status from temp to real
       this.emit('message_status', {
-        messageId: tempId,
+        message_id: tempId,
         status: 'sent',
+        timestamp: Date.now(),
       });
 
       // Emit the confirmed message
@@ -76,19 +78,20 @@ class MockWebSocketServer {
       if (!this.isEnabled) return;
 
       const responses = [
-        { chatId: 'chat-1', senderId: 'user-2', senderName: 'Alice Johnson', senderAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alice', content: 'Hey! How are you doing?' },
-        { chatId: 'chat-1', senderId: 'user-2', senderName: 'Alice Johnson', senderAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alice', content: 'Did you see the latest updates?' },
-        { chatId: 'chat-2', senderId: 'user-3', senderName: 'Bob Smith', senderAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=bob', content: 'I just reviewed everything' },
-        { chatId: 'chat-3', senderId: 'user-2', senderName: 'Alice Johnson', senderAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alice', content: 'Team, great progress today!' },
-        { chatId: 'chat-3', senderId: 'user-4', senderName: 'Carol White', senderAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=carol', content: 'Agreed! Let\'s keep it up.' },
-        { chatId: 'chat-4', senderId: 'user-5', senderName: 'David Brown', senderAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=david', content: 'The design iterations are coming along nicely' },
+        { chat_id: 'chat-1', sender_id: 'user-2', sender_name: 'Alice Johnson', sender_avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alice', content: 'Hey! How are you doing?' },
+        { chat_id: 'chat-1', sender_id: 'user-2', sender_name: 'Alice Johnson', sender_avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alice', content: 'Did you see the latest updates?' },
+        { chat_id: 'chat-2', sender_id: 'user-3', sender_name: 'Bob Smith', sender_avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=bob', content: 'I just reviewed everything' },
+        { chat_id: 'chat-3', sender_id: 'user-2', sender_name: 'Alice Johnson', sender_avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alice', content: 'Team, great progress today!' },
+        { chat_id: 'chat-3', sender_id: 'user-4', sender_name: 'Carol White', sender_avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=carol', content: 'Agreed! Let\'s keep it up.' },
+        { chat_id: 'chat-4', sender_id: 'user-5', sender_name: 'David Brown', sender_avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=david', content: 'The design iterations are coming along nicely' },
       ];
 
       const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-      const newMessage: Message = {
-        id: `msg-sim-${Date.now()}`,
+      const newMessage: ApiMessage = {
+        message_id: `msg-sim-${Date.now()}`,
         ...randomResponse,
-        timestamp: Date.now(),
+        type: 'text',
+        created_at: Date.now(),
         status: 'sent',
       };
 
@@ -107,9 +110,9 @@ class MockWebSocketServer {
         const statusEvent: UserStatusEvent = {
           type: 'user_status',
           data: {
-            userId: randomUserId,
+            user_id: randomUserId,
             status: randomStatus,
-            lastSeen: randomStatus === 'offline' ? Date.now() : undefined,
+            last_seen: randomStatus === 'offline' ? Date.now() : undefined,
           },
         };
         this.emit('user_status', statusEvent.data);

@@ -68,8 +68,8 @@ export function GroupSettingsDialog({
   const [isSearching, setIsSearching] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const isOwner = user?.user_id === group.owner_id;
-  const currentUserMember = group.members.find(m => m.user_id === user?.user_id);
+  const isOwner = user?.id === group.ownerId;
+  const currentUserMember = group.members.find(m => m.userId === user?.id);
   const isAdmin = currentUserMember?.role === 'admin' || isOwner;
 
   /**
@@ -86,9 +86,9 @@ export function GroupSettingsDialog({
       try {
         const response = await api.user.searchUsers(searchQuery, 1, 10);
         // 过滤掉已在群组中的成员
-        const memberIds = group.members.map((m) => m.user_id);
+        const memberIds = group.members.map((m) => m.userId);
         setSearchResults(
-          response.items.filter((user) => !memberIds.includes(user.user_id))
+          response.items.filter((user) => !memberIds.includes(user.id))
         );
       } catch (error) {
         console.error('Search users failed:', error);
@@ -107,7 +107,7 @@ export function GroupSettingsDialog({
   const handleAddMember = async (userId: string) => {
     setIsProcessing(true);
     try {
-      await api.group.addMembers(group.group_id, [userId]);
+      await api.group.addMembers(group.id, [userId]);
       toast.success('成员已添加');
       setSearchQuery('');
       setSearchResults([]);
@@ -128,7 +128,7 @@ export function GroupSettingsDialog({
 
     setIsProcessing(true);
     try {
-      await api.group.removeMember(group.group_id, userId);
+      await api.group.removeMember(group.id, userId);
       toast.success('成员已移除');
       if (onUpdate) onUpdate();
     } catch (error) {
@@ -147,7 +147,7 @@ export function GroupSettingsDialog({
 
     setIsProcessing(true);
     try {
-      await api.group.leaveGroup(group.group_id);
+      await api.group.leaveGroup(group.id);
       toast.success('已退出群聊');
       onOpenChange(false);
       if (onLeave) onLeave();
@@ -167,7 +167,7 @@ export function GroupSettingsDialog({
 
     setIsProcessing(true);
     try {
-      await api.group.deleteGroup(group.group_id);
+      await api.group.deleteGroup(group.id);
       toast.success('群聊已解散');
       onOpenChange(false);
       if (onDelete) onDelete();
@@ -211,7 +211,7 @@ export function GroupSettingsDialog({
         <DialogHeader>
           <DialogTitle>群聊设置</DialogTitle>
           <DialogDescription>
-            {group.name} · {group.member_count} 成员
+            {group.name} · {group.memberCount} 成员
           </DialogDescription>
         </DialogHeader>
 
@@ -240,14 +240,14 @@ export function GroupSettingsDialog({
               {/* 群头像 */}
               <div className="flex items-center gap-4">
                 <Avatar className="w-16 h-16">
-                  <AvatarImage src={group.avatar_url} />
+                  <AvatarImage src={group.avatar} />
                   <AvatarFallback className="text-lg">
                     {getAvatarFallback(group.name)}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <h3 className="text-lg font-semibold">{group.name}</h3>
-                  <p className="text-sm text-gray-500">{group.member_count} 成员</p>
+                  <p className="text-sm text-gray-500">{group.memberCount} 成员</p>
                 </div>
               </div>
 
@@ -313,12 +313,12 @@ export function GroupSettingsDialog({
                     <div className="mt-2 border rounded-md max-h-40 overflow-y-auto">
                       {searchResults.map((searchUser) => (
                         <div
-                          key={searchUser.user_id}
+                          key={searchUser.id}
                           className="flex items-center justify-between p-3 hover:bg-gray-50 border-b last:border-0"
                         >
                           <div className="flex items-center gap-3 flex-1 min-w-0">
                             <Avatar className="w-8 h-8">
-                              <AvatarImage src={searchUser.avatar_url} />
+                              <AvatarImage src={searchUser.avatar} />
                               <AvatarFallback className="text-xs">
                                 {getAvatarFallback(searchUser.name)}
                               </AvatarFallback>
@@ -331,7 +331,7 @@ export function GroupSettingsDialog({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleAddMember(searchUser.user_id)}
+                            onClick={() => handleAddMember(searchUser.id)}
                             disabled={isProcessing}
                           >
                             <Plus className="w-4 h-4" />
@@ -353,15 +353,15 @@ export function GroupSettingsDialog({
                 <ScrollArea className="flex-1">
                   <div className="space-y-2">
                     {group.members.map((member) => {
-                      const canRemove = isAdmin && member.user_id !== user?.user_id && member.role !== 'owner';
+                      const canRemove = isAdmin && member.userId !== user?.id && member.role !== 'owner';
                       return (
                         <div
-                          key={member.user_id}
+                          key={member.userId}
                           className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50"
                         >
                           <div className="flex items-center gap-3 flex-1 min-w-0">
                             <Avatar className="w-10 h-10">
-                              <AvatarImage src={member.avatar_url} />
+                              <AvatarImage src={member.avatar} />
                               <AvatarFallback>
                                 {getAvatarFallback(member.name)}
                               </AvatarFallback>
@@ -370,13 +370,13 @@ export function GroupSettingsDialog({
                               <div className="flex items-center gap-2">
                                 <p className="text-sm font-medium truncate">{member.name}</p>
                                 {getRoleIcon(member.role)}
-                                {member.user_id === user?.user_id && (
+                                {member.userId === user?.id && (
                                   <span className="text-xs text-gray-500">(你)</span>
                                 )}
                               </div>
-                              {member.joined_at && (
+                              {member.joinedAt && (
                                 <p className="text-xs text-gray-500">
-                                  加入于 {new Date(member.joined_at * 1000).toLocaleDateString('zh-CN')}
+                                  加入于 {new Date(member.joinedAt * 1000).toLocaleDateString('zh-CN')}
                                 </p>
                               )}
                             </div>
@@ -385,7 +385,7 @@ export function GroupSettingsDialog({
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleRemoveMember(member.user_id, member.name)}
+                              onClick={() => handleRemoveMember(member.userId, member.name)}
                               disabled={isProcessing}
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             >

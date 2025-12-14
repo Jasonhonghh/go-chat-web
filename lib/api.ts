@@ -22,18 +22,18 @@
 
 import axios, { AxiosInstance } from 'axios';
 import {
-  User,
-  Chat,
-  Message,
-  Group,
-  GroupMember,
+  User, ApiUser,
+  Chat, ApiChat,
+  Message, ApiMessage,
+  Group, ApiGroup,
+  GroupMember, ApiGroupMember,
   TokenData,
-  LoginResponse,
+  ApiLoginResponse,
   APIResponse,
   PaginatedResponse,
-  ChatListResponse,
-  MessageListResponse,
-  UserSearchResponse,
+  ApiChatListResponse,
+  ApiMessageListResponse,
+  ApiUserSearchResponse,
   UploadedFile,
   RegisterRequest,
   LoginRequest,
@@ -41,6 +41,68 @@ import {
   UpdateProfileRequest,
   UpdateUserStatusRequest,
 } from './types';
+
+// ============================================================================
+// Mappers
+// ============================================================================
+
+export const mapUser = (apiUser: ApiUser): User => ({
+  id: apiUser.user_id,
+  email: apiUser.email,
+  name: apiUser.name,
+  avatar: apiUser.avatar_url,
+  status: apiUser.status,
+  bio: apiUser.bio,
+  lastSeen: apiUser.last_seen,
+});
+
+export const mapMessage = (apiMsg: ApiMessage): Message => ({
+  id: apiMsg.message_id,
+  chatId: apiMsg.chat_id,
+  senderId: apiMsg.sender_id,
+  senderName: apiMsg.sender_name,
+  senderAvatar: apiMsg.sender_avatar,
+  content: apiMsg.content,
+  type: apiMsg.type,
+  status: apiMsg.status,
+  replyTo: apiMsg.reply_to,
+  editedAt: apiMsg.edited_at,
+  createdAt: apiMsg.created_at,
+});
+
+export const mapChat = (apiChat: ApiChat): Chat => ({
+  id: apiChat.chat_id,
+  type: apiChat.type,
+  name: apiChat.name,
+  avatar: apiChat.avatar_url,
+  description: apiChat.description,
+  participants: apiChat.participants.map(mapUser),
+  lastMessage: apiChat.last_message ? mapMessage(apiChat.last_message) : undefined,
+  unreadCount: apiChat.unread_count,
+  createdAt: apiChat.created_at,
+  updatedAt: apiChat.updated_at,
+});
+
+export const mapGroupMember = (apiMember: ApiGroupMember): GroupMember => ({
+  userId: apiMember.user_id,
+  name: apiMember.name,
+  avatar: apiMember.avatar_url,
+  role: apiMember.role,
+  joinedAt: apiMember.joined_at,
+});
+
+export const mapGroup = (apiGroup: ApiGroup): Group => ({
+  id: apiGroup.group_id,
+  chatId: apiGroup.chat_id,
+  name: apiGroup.name,
+  description: apiGroup.description,
+  avatar: apiGroup.avatar_url,
+  ownerId: apiGroup.owner_id,
+  members: apiGroup.members.map(mapGroupMember),
+  memberCount: apiGroup.member_count,
+  createdAt: apiGroup.created_at,
+  updatedAt: apiGroup.updated_at,
+});
 
 // ============================================================================
 // API 客户端初始化
@@ -124,22 +186,25 @@ const authAPI = {
    * 用户注册
    */
   register: async (data: RegisterRequest): Promise<User> => {
-    const response = await axiosInstance.post<APIResponse<User>>('/auth/register', data);
-    return response.data.data!;
+    const response = await axiosInstance.post<APIResponse<ApiUser>>('/auth/register', data);
+    return mapUser(response.data.data!);
   },
 
   /**
    * 用户登录
    */
-  login: async (data: LoginRequest): Promise<LoginResponse> => {
-    const response = await axiosInstance.post<APIResponse<LoginResponse>>('/auth/login', data);
+  login: async (data: LoginRequest): Promise<TokenData & { user: User }> => {
+    const response = await axiosInstance.post<APIResponse<ApiLoginResponse>>('/auth/login', data);
     const loginData = response.data.data!;
 
     // 保存 Token
     localStorage.setItem('authToken', loginData.access_token);
     localStorage.setItem('refreshToken', loginData.refresh_token);
 
-    return loginData;
+    return {
+      ...loginData,
+      user: mapUser(loginData.user),
+    };
   },
 
   /**
@@ -170,34 +235,38 @@ const userAPI = {
    * 获取当前用户档案
    */
   getProfile: async (): Promise<User> => {
-    const response = await axiosInstance.get<APIResponse<User>>('/users/profile');
-    return response.data.data!;
+    const response = await axiosInstance.get<APIResponse<ApiUser>>('/users/profile');
+    return mapUser(response.data.data!);
   },
 
   /**
    * 更新当前用户档案
    */
   updateProfile: async (data: UpdateProfileRequest): Promise<User> => {
-    const response = await axiosInstance.put<APIResponse<User>>('/users/profile', data);
-    return response.data.data!;
+    const response = await axiosInstance.put<APIResponse<ApiUser>>('/users/profile', data);
+    return mapUser(response.data.data!);
   },
 
   /**
    * 获取指定用户信息
    */
   getUser: async (userId: string): Promise<User> => {
-    const response = await axiosInstance.get<APIResponse<User>>(`/users/${userId}`);
-    return response.data.data!;
+    const response = await axiosInstance.get<APIResponse<ApiUser>>(`/users/${userId}`);
+    return mapUser(response.data.data!);
   },
 
   /**
    * 搜索用户
    */
-  searchUsers: async (query: string, page: number = 1, limit: number = 20): Promise<UserSearchResponse> => {
-    const response = await axiosInstance.get<APIResponse<UserSearchResponse>>('/users/search', {
+  searchUsers: async (query: string, page: number = 1, limit: number = 20): Promise<PaginatedResponse<User>> => {
+    const response = await axiosInstance.get<APIResponse<ApiUserSearchResponse>>('/users/search', {
       params: { query, page, limit },
     });
-    return response.data.data!;
+    const { items, pagination } = response.data.data!;
+    return {
+      items: items.map(mapUser),
+      pagination,
+    };
   },
 
   /**
@@ -219,27 +288,31 @@ const chatAPI = {
   /**
    * 获取聊天列表
    */
-  getChats: async (params?: { page?: number; limit?: number; sort?: string }): Promise<ChatListResponse> => {
-    const response = await axiosInstance.get<APIResponse<ChatListResponse>>('/chats', { params });
-    return response.data.data!;
+  getChats: async (params?: { page?: number; limit?: number; sort?: string }): Promise<PaginatedResponse<Chat>> => {
+    const response = await axiosInstance.get<APIResponse<ApiChatListResponse>>('/chats', { params });
+    const { items, pagination } = response.data.data!;
+    return {
+      items: items.map(mapChat),
+      pagination,
+    };
   },
 
   /**
    * 获取聊天详情
    */
   getChat: async (chatId: string): Promise<Chat> => {
-    const response = await axiosInstance.get<APIResponse<Chat>>(`/chats/${chatId}`);
-    return response.data.data!;
+    const response = await axiosInstance.get<APIResponse<ApiChat>>(`/chats/${chatId}`);
+    return mapChat(response.data.data!);
   },
 
   /**
    * 创建私聊
    */
   createPrivateChat: async (participantId: string): Promise<Chat> => {
-    const response = await axiosInstance.post<APIResponse<Chat>>('/chats/private', {
+    const response = await axiosInstance.post<APIResponse<ApiChat>>('/chats/private', {
       participant_id: participantId,
     });
-    return response.data.data!;
+    return mapChat(response.data.data!);
   },
 
   /**
@@ -262,12 +335,16 @@ const messageAPI = {
   getMessages: async (
     chatId: string,
     params?: { page?: number; limit?: number; sort?: string }
-  ): Promise<MessageListResponse> => {
-    const response = await axiosInstance.get<APIResponse<MessageListResponse>>(
+  ): Promise<PaginatedResponse<Message>> => {
+    const response = await axiosInstance.get<APIResponse<ApiMessageListResponse>>(
       `/chats/${chatId}/messages`,
       { params }
     );
-    return response.data.data!;
+    const { items, pagination } = response.data.data!;
+    return {
+      items: items.map(mapMessage),
+      pagination,
+    };
   },
 
   /**
@@ -277,22 +354,22 @@ const messageAPI = {
     chatId: string,
     data: { content: string; type?: string; reply_to?: string }
   ): Promise<Message> => {
-    const response = await axiosInstance.post<APIResponse<Message>>(
+    const response = await axiosInstance.post<APIResponse<ApiMessage>>(
       `/chats/${chatId}/messages`,
       data
     );
-    return response.data.data!;
+    return mapMessage(response.data.data!);
   },
 
   /**
    * 编辑消息
    */
   editMessage: async (messageId: string, content: string): Promise<Message> => {
-    const response = await axiosInstance.put<APIResponse<Message>>(
+    const response = await axiosInstance.put<APIResponse<ApiMessage>>(
       `/messages/${messageId}`,
       { content }
     );
-    return response.data.data!;
+    return mapMessage(response.data.data!);
   },
 
   /**
@@ -309,12 +386,16 @@ const messageAPI = {
     chatId: string,
     query: string,
     params?: { page?: number; limit?: number }
-  ): Promise<MessageListResponse> => {
-    const response = await axiosInstance.get<APIResponse<MessageListResponse>>(
+  ): Promise<PaginatedResponse<Message>> => {
+    const response = await axiosInstance.get<APIResponse<ApiMessageListResponse>>(
       `/chats/${chatId}/messages/search`,
       { params: { query, ...params } }
     );
-    return response.data.data!;
+    const { items, pagination } = response.data.data!;
+    return {
+      items: items.map(mapMessage),
+      pagination,
+    };
   },
 };
 
@@ -331,16 +412,16 @@ const groupAPI = {
     avatar_url?: string;
     member_ids: string[];
   }): Promise<Group> => {
-    const response = await axiosInstance.post<APIResponse<Group>>('/groups', data);
-    return response.data.data!;
+    const response = await axiosInstance.post<APIResponse<ApiGroup>>('/groups', data);
+    return mapGroup(response.data.data!);
   },
 
   /**
    * 获取群聊详情
    */
   getGroup: async (groupId: string): Promise<Group> => {
-    const response = await axiosInstance.get<APIResponse<Group>>(`/groups/${groupId}`);
-    return response.data.data!;
+    const response = await axiosInstance.get<APIResponse<ApiGroup>>(`/groups/${groupId}`);
+    return mapGroup(response.data.data!);
   },
 
   /**
@@ -350,8 +431,8 @@ const groupAPI = {
     groupId: string,
     data: { name?: string; description?: string; avatar_url?: string }
   ): Promise<Group> => {
-    const response = await axiosInstance.put<APIResponse<Group>>(`/groups/${groupId}`, data);
-    return response.data.data!;
+    const response = await axiosInstance.put<APIResponse<ApiGroup>>(`/groups/${groupId}`, data);
+    return mapGroup(response.data.data!);
   },
 
   /**
@@ -359,9 +440,13 @@ const groupAPI = {
    */
   addMembers: async (groupId: string, memberIds: string[]): Promise<{ group_id: string; added_members: GroupMember[] }> => {
     const response = await axiosInstance.post<
-      APIResponse<{ group_id: string; added_members: GroupMember[] }>
+      APIResponse<{ group_id: string; added_members: ApiGroupMember[] }>
     >(`/groups/${groupId}/members`, { member_ids: memberIds });
-    return response.data.data!;
+    const { group_id, added_members } = response.data.data!;
+    return {
+      group_id,
+      added_members: added_members.map(mapGroupMember),
+    };
   },
 
   /**

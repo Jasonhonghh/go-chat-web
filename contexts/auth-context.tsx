@@ -23,8 +23,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetch user profile
   const fetchUserProfile = async () => {
     try {
-      const response = await api.get<User>('/user/profile');
-      setUser(response.data);
+      const userProfile = await api.user.getProfile();
+      setUser(userProfile);
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
       removeAuthToken();
